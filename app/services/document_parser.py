@@ -8,7 +8,7 @@ from pypdf import PdfReader
 class ParsedPage:
     page_number: int
     content: str
-    section: str | None = None
+
 
 @dataclass
 class ParsedBlock:
@@ -22,6 +22,7 @@ class ParsedDocument:
     filename: str
     file_type: str
     pages: list[ParsedPage]
+    blocks: list[ParsedBlock]
 
     @property
     def full_text(self) -> str:
@@ -30,6 +31,7 @@ class ParsedDocument:
             for page in self.pages
             if page.content.strip()
         )
+
 
 class DocumentParser:
     SUPPORTED_EXTENSIONS = {
@@ -70,15 +72,29 @@ class DocumentParser:
             encoding="utf-8",
         )
 
+        page = ParsedPage(
+            page_number=1,
+            content=content,
+        )
+
+        if extension == ".md":
+            blocks = self._parse_markdown_blocks(
+                content,
+                page_number=1,
+            )
+        else:
+            blocks = [
+                ParsedBlock(
+                    content=content.strip(),
+                    page_number=1,
+                )
+            ]
+
         return ParsedDocument(
             filename=path.name,
             file_type=extension.lstrip("."),
-            pages=[
-                ParsedPage(
-                    page_number=1,
-                    content=content,
-                )
-            ],
+            pages=[page],
+            blocks=blocks,
         )
 
     def _parse_pdf(
@@ -88,19 +104,78 @@ class DocumentParser:
         reader = PdfReader(str(path))
 
         pages = []
+        blocks = []
 
         for index, page in enumerate(reader.pages):
+            page_number = index + 1
             content = page.extract_text() or ""
 
             pages.append(
                 ParsedPage(
-                    page_number=index + 1,
+                    page_number=page_number,
                     content=content,
                 )
             )
+
+            if content.strip():
+                blocks.append(
+                    ParsedBlock(
+                        content=content.strip(),
+                        page_number=page_number,
+                    )
+                )
 
         return ParsedDocument(
             filename=path.name,
             file_type="pdf",
             pages=pages,
+            blocks=blocks,
         )
+
+    def _parse_markdown_blocks(
+        self,
+        content: str,
+        page_number: int,
+    ) -> list[ParsedBlock]:
+        lines = content.splitlines()
+
+        blocks = []
+        current_section = None
+        current_lines = []
+
+        def flush_block():
+            if not current_lines:
+                return
+
+            block_content = "\n".join(
+                current_lines
+            ).strip()
+
+            if block_content:
+                blocks.append(
+                    ParsedBlock(
+                        content=block_content,
+                        section=current_section,
+                        page_number=page_number,
+                    )
+                )
+
+            current_lines.clear()
+
+        for line in lines:
+            stripped = line.strip()
+
+            if stripped.startswith("#"):
+                heading = stripped.lstrip("#").strip()
+
+                if heading:
+                    flush_block()
+                    current_section = heading
+
+                continue
+
+            current_lines.append(line)
+
+        flush_block()
+
+        return blocks

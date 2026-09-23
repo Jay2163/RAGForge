@@ -156,3 +156,87 @@ def test_chunk_document_preserves_page_metadata():
     assert chunk_indexes == list(
         range(len(chunks))
     )
+def test_chunk_document_preserves_page_metadata():
+    from app.services.document_parser import ParsedPage
+
+    pages = [
+        ParsedPage(
+            page_number=1,
+            content=(
+                "PostgreSQL indexes improve query performance."
+            ),
+        ),
+        ParsedPage(
+            page_number=2,
+            content=(
+                "B-tree indexes support equality "
+                "and range queries."
+            ),
+        ),
+    ]
+
+    service = ChunkingService(
+        max_chunk_size=100,
+        overlap=20,
+    )
+
+    chunks = service.chunk_document(pages)
+
+    assert len(chunks) > 0
+
+    page_numbers = {
+        chunk.page_number
+        for chunk in chunks
+    }
+
+    assert 1 in page_numbers
+    assert 2 in page_numbers
+
+    chunk_indexes = [
+        chunk.chunk_index
+        for chunk in chunks
+    ]
+
+    assert chunk_indexes == list(
+        range(len(chunks))
+    )
+
+def test_chunk_blocks_preserves_metadata():
+    from app.services.document_parser import ParsedBlock
+
+    blocks = [
+        ParsedBlock(
+            content=(
+                "PostgreSQL indexes improve query performance."
+            ),
+            section="Indexes",
+            page_number=3,
+        ),
+        ParsedBlock(
+            content=(
+                "Transactions provide atomicity."
+            ),
+            section="Transactions",
+            page_number=4,
+        ),
+    ]
+
+    service = ChunkingService(
+        max_chunk_size=100,
+        overlap=20,
+    )
+
+    chunks = service.chunk_blocks(blocks)
+
+    assert len(chunks) == 2
+
+    assert chunks[0].page_number == 3
+    assert chunks[0].section == "Indexes"
+
+    assert chunks[1].page_number == 4
+    assert chunks[1].section == "Transactions"
+
+    assert [
+        chunk.chunk_index
+        for chunk in chunks
+    ] == [0, 1]

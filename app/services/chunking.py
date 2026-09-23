@@ -316,3 +316,26 @@ class ChunkingService:
                 chunk_index += 1
 
         return all_chunks
+
+    def chunk_blocks(
+        self,
+        blocks: list,
+    ) -> List[Chunk]:
+        all_chunks = []
+        chunk_index = 0
+
+        for block in blocks:
+            block_chunks = self.chunk_text(
+                block.content
+            )
+
+            for chunk in block_chunks:
+                chunk.chunk_index = chunk_index
+                chunk.page_number = block.page_number
+                chunk.section = block.section
+
+                all_chunks.append(chunk)
+
+                chunk_index += 1
+
+        return all_chunks

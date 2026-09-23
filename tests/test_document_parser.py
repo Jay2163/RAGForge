@@ -74,3 +74,45 @@ def test_parse_pdf():
 
     for page in result.pages:
         assert page.page_number >= 1
+
+def test_parse_markdown_sections(tmp_path: Path):
+    file_path = tmp_path / "example.md"
+
+    file_path.write_text(
+        "# PostgreSQL\n\n"
+        "PostgreSQL is a relational database.\n\n"
+        "## Indexes\n\n"
+        "Indexes improve query performance.\n\n"
+        "## Transactions\n\n"
+        "Transactions provide atomicity.",
+        encoding="utf-8",
+    )
+
+    parser = DocumentParser()
+
+    result = parser.parse(
+        str(file_path)
+    )
+
+    assert len(result.blocks) == 3
+
+    assert result.blocks[0].section == "PostgreSQL"
+    assert (
+        result.blocks[0].content
+        == "PostgreSQL is a relational database."
+    )
+
+    assert result.blocks[1].section == "Indexes"
+    assert (
+        result.blocks[1].content
+        == "Indexes improve query performance."
+    )
+
+    assert result.blocks[2].section == "Transactions"
+    assert (
+        result.blocks[2].content
+        == "Transactions provide atomicity."
+    )
+
+    for block in result.blocks:
+        assert block.page_number == 1
