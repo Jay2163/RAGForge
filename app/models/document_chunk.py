@@ -1,9 +1,13 @@
 from datetime import datetime
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.database import Base
+
+
+EMBEDDING_DIMENSION = 384
 
 
 class DocumentChunk(Base):
@@ -37,6 +41,11 @@ class DocumentChunk(Base):
 
     section: Mapped[str | None] = mapped_column(
         String(500),
+        nullable=True,
+    )
+
+    embedding: Mapped[list[float] | None] = mapped_column(
+        Vector(EMBEDDING_DIMENSION),
         nullable=True,
     )
 
