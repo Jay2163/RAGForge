@@ -4,7 +4,7 @@ from app.core.config import settings
 
 
 class LLMService:
-    MODEL_NAME = "gemini-3.7-flash"
+    MODEL_NAME = "gemini-3.6-flash"
 
     def __init__(self):
         self.client = genai.Client(

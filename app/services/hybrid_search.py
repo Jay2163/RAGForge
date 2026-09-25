@@ -39,8 +39,6 @@ class HybridSearchService:
             query=query,
             top_k=top_k,
         )
-        print("\n\n\n vector_results", vector_results)
-        print("\n\n\n lexical_results", lexical_results)
 
         # chunk_id -> information used for RRF
         combined = {}
