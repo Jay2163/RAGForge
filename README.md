@@ -210,9 +210,54 @@ The system is designed to combine both approaches.
 | Document parsing | pypdf                       |
 | Configuration    | Pydantic Settings           |
 | Testing          | pytest                      |
-| Vector search    | pgvector                    |
-| Retrieval        | Semantic + Lexical + Hybrid |
-| Generation       | LLM                         |
+| Vector search    | pgvector, ChromaDB          |
+| Lexical search   | PostgreSQL tsvector, BM25   |
+| Embedding Model  | all-MiniLM-L6-v2 (384-dim)  |
+| Retrieval        | Dense, Lexical, Hybrid (RRF)|
+| Generation       | Google Gemini (LLM)         |
+| Evaluation       | Hit@k, MRR, NDCG, RAG Triad |
+
+---
+
+## RAG Evaluation & Benchmarking
+
+Evaluating a RAG pipeline is split into two distinct stages: **Retrieval Evaluation** (evaluating evidence discovery) and **Generation Evaluation** (evaluating response fidelity and groundedness).
+
+### 1. Evaluation Metrics Defined
+
+#### A. Retrieval Quality Metrics
+* **Hit@K**: Measures if *at least one* relevant document chunk appears in the top $K$ retrieved results.
+  $$\text{Hit@K} = \begin{cases} 1 & \text{if } \exists d \in \text{Top-}K \text{ where } d \in \text{Relevant} \\ 0 & \text{otherwise} \end{cases}$$
+* **Mean Reciprocal Rank (MRR)**: Measures how high the *first relevant chunk* is placed. A score of $1.0$ means the top result is always relevant.
+  $$\text{MRR} = \frac{1}{|Q|} \sum_{i=1}^{|Q|} \frac{1}{\text{rank}_i}$$
+* **NDCG@K (Normalized Discounted Cumulative Gain)**: Measures ranking quality by penalizing relevant documents that appear lower in the result list (using logarithmic discounting).
+  $$\text{DCG@K} = \sum_{i=1}^K \frac{\text{rel}_i}{\log_2(i + 1)}, \quad \text{NDCG@K} = \frac{\text{DCG@K}}{\text{IDCG@K}}$$
+* **Precision@K & Recall@K**:
+  * **Precision@K**: What proportion of retrieved chunks are actually relevant? $\frac{|\text{Retrieved} \cap \text{Relevant}|}{K}$
+  * **Recall@K**: What proportion of all ground-truth relevant chunks were found? $\frac{|\text{Retrieved} \cap \text{Relevant}|}{|\text{Total Relevant}|}$
+
+#### B. End-to-End Generation Metrics (RAG Triad)
+* **Faithfulness / Groundedness**: Evaluates whether every claim in the LLM's answer is strictly supported by the retrieved context chunks (zero hallucinations).
+* **Answer Relevance**: Measures whether the generated answer directly addresses the user's question without extraneous drift.
+* **Context Precision & Recall**: Verifies if the retrieved context contains sufficient signal with minimal noise.
+
+---
+
+### 2. Baseline Benchmark Results (PostgreSQL pgvector vs Lexical vs Hybrid)
+
+Evaluated on *Building Python Web APIs with FastAPI* (322 chunks indexed, 20 comprehensive ground-truth test queries covering routing, validation, security, database integration, CORS, and testing):
+
+| Retrieval Strategy | Hit@1 | Hit@3 | Hit@5 | Precision@5 | Recall@5 | MRR | NDCG@5 | Latency |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **PGVector (Dense Semantic)** | **0.600** | **0.850** | **0.850** | **0.360** | **0.688** | **0.725** | **0.617** | ~199 ms |
+| **Postgres tsvector (Lexical)** | 0.250 | 0.250 | 0.350 | 0.135 | 0.183 | 0.270 | 0.183 | **~55 ms** |
+| **Postgres Hybrid (RRF $k=60$)** | 0.500 | 0.800 | 0.850 | 0.290 | 0.550 | 0.662 | 0.517 | ~248 ms |
+
+#### Key Insights from 20-Question Baseline Analysis:
+1. **PGVector (Dense Semantic)** achieves **0.725 MRR** and **85.0% Hit@5**, performing solidly on high-level conceptual questions and semantic phrasing.
+2. **Postgres tsvector (Lexical)** achieves only **0.270 MRR** and **35.0% Hit@5** because standard SQL full-text search lacks true BM25 term saturation, term frequency damping, and struggles with vocabulary mismatch.
+3. **Postgres Hybrid RRF** gets pulled down by `tsvector`'s low accuracy (MRR drops from $0.725 \rightarrow 0.662$), demonstrating that naive fusion with a weak lexical retriever hurts overall rank.
+4. **Next Upgrade Path**: Introducing **Rank-BM25** (for true probabilistic keyword saturation) + **ChromaDB** + **Cross-Encoder Re-ranking** to elevate Hit@5, Precision@5, and MRR.
 
 ---
 
