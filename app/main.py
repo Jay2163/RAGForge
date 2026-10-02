@@ -1,6 +1,5 @@
 from fastapi import FastAPI
 
-from app.api.health import router as health_router
 from app.api.documents import router as documents_router
 from app.api.search import router as search_router
 from app.api.lexical_search import router as lexical_search_router
@@ -21,7 +20,6 @@ app = FastAPI(
 )
 
 # Core Routers
-app.include_router(health_router)
 app.include_router(documents_router)
 app.include_router(chat_router)
 
